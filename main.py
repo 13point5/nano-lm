@@ -28,31 +28,7 @@ def _play_with_tokenizer():
     print(tokenizer.decode(tokens) == text)
 
 
-class DatasetV1(Dataset):
-    def __init__(self, txt, tokenizer, context_length, stride):
-        self.input_ids = []
-        self.target_ids = []
-
-        tokens = tokenizer.encode(txt, allowed_special="all")
-        for i in range(0, len(tokens) - context_length, stride):
-            self.input_ids.append(torch.tensor(tokens[i : i + context_length]))
-            self.target_ids.append(torch.tensor(tokens[i + 1 : i + context_length + 1]))
-
-    def __len__(self):
-        return len(self.input_ids)
-
-    def __getitem__(self, idx):
-        return self.input_ids[idx], self.target_ids[idx]
-
-
-def create_dataloader_v1(txt, batch_size=4, context_length=256, stride=128, shuffle=True):
-    tokenizer = tiktoken.get_encoding("gpt2")
-    dataset = DatasetV1(txt, tokenizer, context_length, stride)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=True)
-    return dataloader
-
-
-def main():
+def _play_with_dataset_v1():
     with open(CORPUS_PATH, "r", encoding="utf-8") as f:
         raw_text = f.read()
 
@@ -86,6 +62,63 @@ def main():
     x, y = next(dataloader_iter)
     print(f"x: {x}")
     print(f"y: {y}")
+
+
+class DatasetV1(Dataset):
+    def __init__(self, txt, tokenizer, context_length, stride):
+        self.input_ids = []
+        self.target_ids = []
+
+        tokens = tokenizer.encode(txt, allowed_special="all")
+        for i in range(0, len(tokens) - context_length, stride):
+            self.input_ids.append(torch.tensor(tokens[i : i + context_length]))
+            self.target_ids.append(torch.tensor(tokens[i + 1 : i + context_length + 1]))
+
+    def __len__(self):
+        return len(self.input_ids)
+
+    def __getitem__(self, idx):
+        return self.input_ids[idx], self.target_ids[idx]
+
+
+def create_dataloader_v1(txt, batch_size=4, context_length=256, stride=128, shuffle=True):
+    tokenizer = tiktoken.get_encoding("gpt2")
+    dataset = DatasetV1(txt, tokenizer, context_length, stride)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=True)
+    return dataloader
+
+
+def main():
+    with open(CORPUS_PATH, "r", encoding="utf-8") as f:
+        raw_text = f.read()
+
+    tokenizer = tiktoken.get_encoding("gpt2")
+
+    # parameters
+    vocab_size = tokenizer.n_vocab
+    embedding_dim = 512
+    context_length = 256
+    batch_size = 4
+
+    dataloader = create_dataloader_v1(
+        raw_text, batch_size=batch_size, context_length=context_length, stride=128, shuffle=False
+    )
+    dataloader_iter = iter(dataloader)
+    batch = next(dataloader_iter)
+    inputs, targets = batch
+    print("Inputs:", inputs.shape)
+    print("Targets:", targets.shape)
+
+    token_embeddings_layer = torch.nn.Embedding(vocab_size, embedding_dim)
+    token_embeddings = token_embeddings_layer(inputs)
+    print("Token embeddings:", token_embeddings.shape)
+
+    position_embeddings_layer = torch.nn.Embedding(context_length, embedding_dim)
+    position_embeddings = position_embeddings_layer(torch.arange(context_length))
+    print("Position embeddings:", position_embeddings.shape)
+
+    input_embeddings = token_embeddings + position_embeddings
+    print("Input embeddings:", input_embeddings.shape)
 
 
 if __name__ == "__main__":
