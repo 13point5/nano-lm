@@ -3,6 +3,7 @@ import tiktoken
 import urllib.request
 
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
 CORPUS_PATH = "data/the-verdict.txt"
@@ -173,5 +174,43 @@ def _play_with_simplifed_self_attention():
     print(f"\ncontext_vectors:\n{context_vectors}")
 
 
+class SelfAttention(nn.Module):
+    def __init__(self, d_in, d_out, qkv_bias=False):
+        super().__init__()
+
+        self.W_q = nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.W_k = nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.W_v = nn.Linear(d_in, d_out, bias=qkv_bias)
+
+    def forward(self, x):
+        Q = self.W_q(x)
+        K = self.W_k(x)
+        V = self.W_v(x)
+
+        d_k = K.shape[-1]
+
+        A = (Q @ K.T) / (d_k**0.5)
+        A = torch.softmax(A, dim=-1)
+        A = A @ V
+
+        return A
+
+
 if __name__ == "__main__":
-    _play_with_simplifed_self_attention()
+    inputs = torch.tensor(
+        [
+            [0.43, 0.15, 0.89],  # Your     (x^1)
+            [0.55, 0.87, 0.66],  # journey  (x^2)
+            [0.57, 0.85, 0.64],  # starts   (x^3)
+            [0.22, 0.58, 0.33],  # with     (x^4)
+            [0.77, 0.25, 0.10],  # one      (x^5)
+            [0.05, 0.80, 0.55],  # step     (x^6)
+        ]
+    )
+
+    d_in = inputs.shape[1]
+    d_out = 2
+
+    torch.manual_seed(789)
+    sa = SelfAttention(d_in, d_out)
+    print(sa(inputs))
