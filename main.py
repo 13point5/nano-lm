@@ -121,5 +121,57 @@ def main():
     print("Input embeddings:", input_embeddings.shape)
 
 
+def _play_with_attention():
+    inputs = torch.tensor(
+        [
+            [0.43, 0.15, 0.89],  # Your     (x^1)
+            [0.55, 0.87, 0.66],  # journey  (x^2)
+            [0.57, 0.85, 0.64],  # starts   (x^3)
+            [0.22, 0.58, 0.33],  # with     (x^4)
+            [0.77, 0.25, 0.10],  # one      (x^5)
+            [0.05, 0.80, 0.55],  # step     (x^6)
+        ]
+    )
+    print("inputs.shape:", inputs.shape)
+
+    query_2 = inputs[1]
+
+    # dot product of query with input embedding vectors
+    attention_scores = torch.zeros(inputs.shape[0])
+    for i in range(inputs.shape[0]):
+        attention_scores[i] = torch.dot(query_2, inputs[i])
+
+    print(f"\nattention_scores:\n{attention_scores}")
+
+    # normalize the attention scores with softmax
+    attention_weights = torch.softmax(attention_scores, dim=0)
+    print(f"\nattention_weights\n{attention_weights}")
+
+    context_vector_2 = torch.zeros(query_2.shape)
+    for i in range(len(attention_weights)):
+        context_vector_2 += attention_weights[i] * inputs[i]
+    print(f"\ncontext_vector_2\n{context_vector_2}")
+
+
+def _play_with_simplifed_self_attention():
+    inputs = torch.tensor(
+        [
+            [0.43, 0.15, 0.89],  # Your     (x^1)
+            [0.55, 0.87, 0.66],  # journey  (x^2)
+            [0.57, 0.85, 0.64],  # starts   (x^3)
+            [0.22, 0.58, 0.33],  # with     (x^4)
+            [0.77, 0.25, 0.10],  # one      (x^5)
+            [0.05, 0.80, 0.55],  # step     (x^6)
+        ]
+    )
+
+    attention_scores = inputs @ inputs.T
+
+    attention_weights = torch.softmax(attention_scores, dim=1)
+
+    context_vectors = attention_weights @ inputs
+    print(f"\ncontext_vectors:\n{context_vectors}")
+
+
 if __name__ == "__main__":
-    main()
+    _play_with_simplifed_self_attention()
