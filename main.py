@@ -175,25 +175,37 @@ def _play_with_simplifed_self_attention():
 
 
 class SelfAttention(nn.Module):
-    def __init__(self, d_in, d_out, qkv_bias=False):
+    def __init__(self, d_in, d_out, context_length, dropout=0.1, qkv_bias=False):
         super().__init__()
 
         self.W_q = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_k = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_v = nn.Linear(d_in, d_out, bias=qkv_bias)
 
+        self.dropout = nn.Dropout(dropout)
+
+        self.register_buffer(
+            "mask", torch.triu(torch.ones(context_length, context_length), diagonal=1)
+        )
+
     def forward(self, x):
+        batch, num_tokens, d_in = x.shape
+
         Q = self.W_q(x)
         K = self.W_k(x)
         V = self.W_v(x)
 
         d_k = K.shape[-1]
 
-        A = (Q @ K.T) / (d_k**0.5)
-        A = torch.softmax(A, dim=-1)
-        A = A @ V
+        attention_scores = Q @ K.transpose(1, 2)
+        attention_scores.masked_fill(self.mask.bool()[:num_tokens, :num_tokens], -torch.inf)
 
-        return A
+        attention_weights = torch.softmax(attention_scores / (d_k**0.5), dim=-1)
+        attention_weights = self.dropout(attention_weights)
+
+        context_vectors = attention_weights @ V
+
+        return context_vectors
 
 
 if __name__ == "__main__":
@@ -208,9 +220,22 @@ if __name__ == "__main__":
         ]
     )
 
+    # inputs -> 6x3 -> ctx_len x d_in
+    # W_q, W_k, W_v -> d_in x d_out
+    # Q, K, V -> ctx_len x d_out
+    # attention_scores -> ctx_len, ctx_len
+
+    # inputs -> 2x6x3 -> batch x ctx_len x d_in
+    # W_q, W_k, W_v -> d_in x d_out
+    # Q, K, V -> batch x ctx_len x d_out
+    # attention_scores -> batch x ctx_len x ctx_len
+
     d_in = inputs.shape[1]
     d_out = 2
 
-    torch.manual_seed(789)
-    sa = SelfAttention(d_in, d_out)
-    print(sa(inputs))
+    batch = torch.stack((inputs, inputs), dim=0)
+    context_length = batch.shape[1]
+
+    torch.manual_seed(123)
+    sa = SelfAttention(d_in, d_out, context_length)
+    print(sa(batch).shape)
